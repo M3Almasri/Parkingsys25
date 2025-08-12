@@ -47,12 +47,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       try {
-        const res = await fetch(`/api/slots/release/${slotId}`, {
+        const res = await fetch(`/api/slots/release`, {
+
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
+          body: JSON.stringify({ slot_id: parseInt(slotId) })
+
         });
 
         const data = await res.json();
