@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parking System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 32px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+            margin-top: 5px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .welcome-message {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+
+        .login-prompt {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .login-prompt a {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .login-prompt a:hover {
+            text-decoration: underline;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .slots-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .slots-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 24px;
+        }
+
+        .slots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .slot-card {
+            border: 2px solid #28a745;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            background: #f8f9fa;
+        }
+
+        .slot-card.occupied {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+
+        .slot-card.reserved {
+            border-color: #ffc107;
+            background: #fffbf0;
+        }
+
+        .slot-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            background: #28a745;
+        }
+
+        .slot-card.occupied .slot-indicator {
+            background: #dc3545;
+        }
+
+        .slot-card.reserved .slot-indicator {
+            background: #ffc107;
+        }
+
+        .slot-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .slot-card p {
+            color: #666;
+            margin: 5px 0;
+        }
+
+        .refresh-btn {
+            display: block;
+            margin: 20px auto;
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .refresh-btn:hover {
+            background: #0056b3;
+        }
+
+        .actions-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .action-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .action-card h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+        }
+
+        .form-group select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .action-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .reserve-btn {
+            background: #007bff;
+            color: white;
+        }
+
+        .reserve-btn:hover {
+            background: #0056b3;
+        }
+
+        .reserve-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .payment-btn {
+            background: #6f42c1;
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .payment-btn:hover {
+            background: #5a32a3;
+        }
+
+        .paypal-btn {
+            background: #0070ba;
+            color: white;
+        }
+
+        .paypal-btn:hover {
+            background: #005ea6;
+        }
+
+        .unlock-btn {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .unlock-btn:hover {
+            background: #e0a800;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .auth-required {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .auth-message {
+            background: #e7f3ff;
+            border: 1px solid #b8daff;
+            color: #004085;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+                gap: 15px;
+            }
+
+            .slots-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .actions-section {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>🚗 Parking System</h1>
+                <p>Reserve your parking spot or pay for your current parking</p>
+            </div>
+            <div class="user-info" id="user-info">
+                <!-- User info will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Login prompt for non-authenticated users -->
+        <div class="login-prompt" id="login-prompt" style="display: none;">
+            <strong>Please log in to reserve parking slots.</strong>
+            <a href="login.html">Click here to login</a> or <a href="register.html">register a new account</a>.
+        </div>
+
+        <!-- Parking Slots Status -->
+        <div class="slots-section">
+            <h2>Parking Slots Status</h2>
+            <div class="slots-grid" id="parking-slots">
+                <!-- Slots will be populated by JavaScript -->
+            </div>
+            <button class="refresh-btn" onclick="loadParkingSlots()">Refresh Status</button>
+        </div>
+
+        <!-- Actions Section -->
+        <div class="actions-section">
+            <!-- Reserve a Parking Slot -->
+            <div class="action-card" id="reserve-section">
+                <h3>Reserve a Parking Slot</h3>
+                <div class="auth-message" id="reserve-auth-message" style="display: none;">
+                    You must be logged in to reserve a parking slot.
+                </div>
+                <div class="error-message" id="reserve-error"></div>
+                <div class="success-message" id="reserve-success"></div>
+                <div class="form-group">
+                    <select id="reservation-slot-select">
+                        <option value="">Select a slot</option>
+                    </select>
+                </div>
+                <button class="action-btn reserve-btn" id="reserve-btn" onclick="reserveSlot()">Reserve Slot</button>
+            </div>
+
+            <!-- Payment -->
+            <div class="action-card" id="payment-section">
+                <h3>Payment</h3>
+                <div class="error-message" id="payment-error"></div>
+                <div class="success-message" id="payment-success"></div>
+                <div class="form-group">
+                    <select id="payment-slot-select">
+                        <option value="">Select slot to pay for</option>
+                    </select>
+                </div>
+                <button class="action-btn payment-btn" onclick="payForSlot('stripe')">Pay with Stripe</button>
+                <button class="action-btn paypal-btn" onclick="payForSlot('paypal')">Pay with PayPal</button>
+            </div>
+
+            <!-- Unlock Your Reserved Slot -->
+            <div class="action-card" id="unlock-section">
+                <h3>Unlock Your Reserved Slot</h3>
+                <div class="error-message" id="unlock-error"></div>
+                <div class="success-message" id="unlock-success"></div>
+                <div class="form-group">
+                    <select id="unlock-slot-select">
+                        <option value="">Select your reserved slot</option>
+                    </select>
+                </div>
+                <button class="action-btn unlock-btn" onclick="unlockSlot()">Unlock Slot</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check authentication status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+            loadParkingSlots();
+        });
+
+        function checkAuthStatus() {
+            const token = localStorage.getItem('token');
+            const username = localStorage.getItem('username');
+            const userInfo = document.getElementById('user-info');
+            const loginPrompt = document.getElementById('login-prompt');
+            const reserveSection = document.getElementById('reserve-section');
+            const reserveAuthMessage = document.getElementById('reserve-auth-message');
+
+            if (token && username) {
+                // User is logged in
+                userInfo.innerHTML = `
+                    <span class="welcome-message">Welcome, ${username}</span>
+                    <button class="logout-btn" onclick="logout()">Logout</button>
+                `;
+                loginPrompt.style.display = 'none';
+                reserveSection.classList.remove('auth-required');
+                reserveAuthMessage.style.display = 'none';
+            } else {
+                // User is not logged in
+                userInfo.innerHTML = `
+                    <a href="login.html" style="color: #007bff; text-decoration: none; font-weight: 500;">Login</a>
+                    <span style="color: #666;">|</span>
+                    <a href="register.html" style="color: #007bff; text-decoration: none; font-weight: 500;">Register</a>
+                `;
+                loginPrompt.style.display = 'block';
+                reserveSection.classList.add('auth-required');
+                reserveAuthMessage.style.display = 'block';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            window.location.href = 'login.html';
+        }
+
+        async function loadParkingSlots() {
+            try {
+                const response = await fetch('/api/slots');
+                const slots = await response.json();
+                
+                const slotsContainer = document.getElementById('parking-slots');
+                const reservationSelect = document.getElementById('reservation-slot-select');
+                const paymentSelect = document.getElementById('payment-slot-select');
+                const unlockSelect = document.getElementById('unlock-slot-select');
+                
+                // Clear existing content
+                slotsContainer.innerHTML = '';
+                reservationSelect.innerHTML = '<option value="">Select a slot</option>';
+                paymentSelect.innerHTML = '<option value="">Select slot to pay for</option>';
+                unlockSelect.innerHTML = '<option value="">Select your reserved slot</option>';
+                
+                slots.forEach(slot => {
+                    // Create slot card
+                    const slotCard = document.createElement('div');
+                    slotCard.className = `slot-card ${slot.status.toLowerCase()}`;
+                    slotCard.innerHTML = `
+                        <div class="slot-indicator"></div>
+                        <h3>Slot ${slot.slot_id}</h3>
+                        <p>Status: ${slot.status}</p>
+                        <p>Gate: ${slot.gate_status}</p>
+                    `;
+                    slotsContainer.appendChild(slotCard);
+                    
+                    // Populate dropdowns based on slot status
+                    if (slot.status === 'Available') {
+                        reservationSelect.innerHTML += `<option value="${slot.slot_id}">Slot ${slot.slot_id}</option>`;
+                    } else if (slot.status === 'Reserved') {
+                        paymentSelect.innerHTML += `<option value="${slot.slot_id}">Slot ${slot.slot_id}</option>`;
+                        unlockSelect.innerHTML += `<option value="${slot.slot_id}">Slot ${slot.slot_id}</option>`;
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading parking slots:', error);
+            }
+        }
+
+        async function reserveSlot() {
+            const token = localStorage.getItem('token');
+            
+            // Check authentication
+            if (!token) {
+                showError('reserve-error', 'You must be logged in to reserve a slot. Please login first.');
+                setTimeout(() => {
+                    window.location.href = 'login.html';
+                }, 2000);
+                return;
+            }
+
+            const slotId = document.getElementById('reservation-slot-select').value;
+            
+            if (!slotId) {
+                showError('reserve-error', 'Please select a slot to reserve.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/slots/reserve', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ slot_id: parseInt(slotId) })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showSuccess('reserve-success', `Slot ${slotId} reserved successfully!`);
+                    loadParkingSlots();
+                } else {
+                    if (response.status === 401) {
+                        showError('reserve-error', 'Your session has expired. Please login again.');
+                        setTimeout(() => {
+                            localStorage.removeItem('token');
+                            localStorage.removeItem('username');
+                            window.location.href = 'login.html';
+                        }, 2000);
+                    } else {
+                        showError('reserve-error', data.message || 'Failed to reserve slot.');
+                    }
+                }
+            } catch (error) {
+                console.error('Error reserving slot:', error);
+                showError('reserve-error', 'Network error. Please try again.');
+            }
+        }
+
+        async function payForSlot(method) {
+            const slotId = document.getElementById('payment-slot-select').value;
+            
+            if (!slotId) {
+                showError('payment-error', 'Please select a slot to pay for.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/slots/pay', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        slot_id: parseInt(slotId),
+                        payment_method: method 
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showSuccess('payment-success', `Payment for Slot ${slotId} processed successfully with ${method}!`);
+                    loadParkingSlots();
+                } else {
+                    showError('payment-error', data.message || 'Payment failed.');
+                }
+            } catch (error) {
+                console.error('Error processing payment:', error);
+                showError('payment-error', 'Network error. Please try again.');
+            }
+        }
+
+        async function unlockSlot() {
+            const slotId = document.getElementById('unlock-slot-select').value;
+            
+            if (!slotId) {
+                showError('unlock-error', 'Please select a slot to unlock.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/slots/unlock', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ slot_id: parseInt(slotId) })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showSuccess('unlock-success', `Slot ${slotId} unlocked successfully!`);
+                    loadParkingSlots();
+                } else {
+                    showError('unlock-error', data.message || 'Failed to unlock slot.');
+                }
+            } catch (error) {
+                console.error('Error unlocking slot:', error);
+                showError('unlock-error', 'Network error. Please try again.');
+            }
+        }
+
+        function showError(elementId, message) {
+            const errorElement = document.getElementById(elementId);
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+
+        function showSuccess(elementId, message) {
+            const successElement = document.getElementById(elementId);
+            successElement.textContent = message;
+            successElement.style.display = 'block';
+            setTimeout(() => {
+                successElement.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
+
