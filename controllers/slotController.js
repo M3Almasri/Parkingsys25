@@ -261,4 +261,51 @@ exports.getUserReservation = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+// Add this entire function to controllers/slotController.js
+
+exports.updateFromHardware = async (req, res) => {
+  // This is a public endpoint, so we don't check for a user token.
+  // For security, you could add an API key check here in the future.
+  const { slot_id, is_occupied } = req.body;
+
+  // Basic validation
+  if (slot_id === undefined || is_occupied === undefined) {
+    return res.status(400).json({ message: 'Missing slot_id or is_occupied status.' });
+  }
+
+  try {
+    const slot = await Slot.findOne({ slot_id: slot_id });
+
+    if (!slot) {
+      return res.status(404).json({ message: 'Slot not found.' });
+    }
+
+    // This logic handles a car physically arriving or leaving.
+    // It assumes that if a car is detected, the slot is no longer available.
+    // If the car leaves, the slot becomes available again.
+    if (is_occupied) {
+      // A car has been physically detected in the slot.
+      slot.is_available = false;
+      // We don't change the light here, as the reservation status (red/yellow) takes precedence.
+      // The main purpose is to block new reservations if a car is present without one.
+    } else {
+      // A car has physically left the slot.
+      // We can reset the slot completely, making it available for a new user.
+      slot.is_available = true;
+      slot.is_reserved = false;
+      slot.is_paid = false;
+      slot.reserved_by = null;
+      slot.gate_status = 'closed';
+      slot.light_status = 'green';
+    }
+
+    await slot.save();
+    res.status(200).json({ message: `Slot ${slot_id} updated successfully from hardware.` });
+
+  } catch (error) {
+    console.error("Error updating from hardware:", error);
+    res.status(500).json({ message: 'Server error while updating from hardware.' });
+  }
+};
+
 
