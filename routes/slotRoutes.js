@@ -20,5 +20,9 @@ router.post('/release', slotController.releaseSlot);
 // GET /api/slots/my-reservation - Get current user's reservation
 router.get('/my-reservation', slotController.getUserReservation);
 
+// Add this line in routes/slotRoutes.js
+router.post('/update-from-hardware', slotController.updateFromHardware);
+
+
 module.exports = router;
 
