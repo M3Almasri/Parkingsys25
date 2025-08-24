@@ -1,15 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const slotController = require('../controllers/slotController');
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authMiddleware'); // This will now work
 
 // =====================================================================
 //      Public Routes (accessible without login)
 // =====================================================================
 
 // GET all slots (for the ESP32 and the frontend to display status)
-// *** FIX: Corrected to use the right controller function name ***
-router.get('/slots', slotController.getAllSlots); 
+router.get('/slots', slotController.getAllSlots);
 
 // POST to update a slot's status from the physical hardware (ESP32)
 router.post('/slots/update-from-hardware', slotController.updateSlotFromHardware);
