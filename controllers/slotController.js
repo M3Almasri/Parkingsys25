@@ -1,269 +1,111 @@
-const Slot = require("../models/Slot");
-const jwt = require('jsonwebtoken');
-const User = require("../models/User");
+const Slot = require('../models/Slot');
+const User = require('../models/User');
 
-// Get all parking slots
-exports.getSlots = async (req, res) => {
-  try {
-    const slots = await Slot.find({});
-    res.json(slots);
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
+// GET /api/slots - Get all parking slots
+exports.getAllSlots = async (req, res) => {
+    try {
+        const slots = await Slot.find().sort({ slot_id: 1 });
+        res.status(200).json(slots);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
 };
 
-// Reserve a slot (requires authentication)
+// POST /api/slots/reserve - Reserve a slot
 exports.reserveSlot = async (req, res) => {
-  try {
-    // Extract token and verify user
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ message: 'Authentication required' });
+    try {
+        const { slot_id } = req.body;
+        const userId = req.user.id;
+
+        const existingReservation = await Slot.findOne({ reserved_by: userId });
+        if (existingReservation) {
+            return res.status(400).json({ message: 'You already have a reservation.' });
+        }
+
+        const slot = await Slot.findOne({ slot_id: slot_id });
+        if (!slot || !slot.is_available) {
+            return res.status(404).json({ message: 'Slot not available.' });
+        }
+
+        slot.is_available = false;
+        slot.is_reserved = true;
+        slot.light_status = 'yellow'; // Pending payment
+        slot.gate_status = 'closed';
+        slot.reserved_by = userId;
+        
+        await slot.save();
+        res.status(200).json(slot);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid user' });
-    }
-
-    const { slot_id } = req.body;
-
-    // Check if user already has a reservation (one slot per user)
-    const existingReservation = await Slot.findOne({ 
-      reserved_by: user.username,
-      $or: [
-        { is_reserved: true },
-        { is_paid: true }
-      ]
-    });
-
-    if (existingReservation) {
-      return res.status(400).json({ 
-        message: 'You already have a reservation. Each user can only reserve one slot at a time.' 
-      });
-    }
-
-    // Find the requested slot
-    const slot = await Slot.findOne({ slot_id });
-    if (!slot) {
-      return res.status(404).json({ message: "Slot not found" });
-    }
-
-    // Check if slot is available
-    if (!slot.is_available || slot.is_reserved || slot.is_paid) {
-      return res.status(400).json({ message: "Slot not available" });
-    }
-
-    // Reserve the slot (but don't set is_reserved until payment)
-    const updatedSlot = await Slot.findOneAndUpdate(
-      { slot_id },
-      {
-        is_available: false,  // Mark as not available
-        is_reserved: false,   // Don't set reserved until payment
-        is_paid: false,
-        gate_status: 'closed',
-        light_status: 'yellow', // Yellow indicates pending payment
-        reserved_by: user.username
-      },
-      { new: true }
-    );
-
-    res.json({ 
-      message: "Slot reserved successfully. Please proceed to payment to confirm your reservation.", 
-      slot: updatedSlot 
-    });
-
-  } catch (err) {
-    console.error('Reserve slot error:', err);
-    if (err.name === 'JsonWebTokenError') {
-      return res.status(401).json({ message: 'Invalid token' });
-    }
-    res.status(500).json({ message: "Server error" });
-  }
 };
 
-// Pay for a slot (confirms the reservation)
-exports.payForSlot = async (req, res) => {
-  try {
-    const { slot_id, payment_method } = req.body;
+// POST /api/slots/payment-success - Handle successful payment
+exports.handlePaymentSuccess = async (req, res) => {
+    try {
+        const { slot_id, payment_method } = req.body;
+        const userId = req.user.id;
 
-    // Find the slot
-    const slot = await Slot.findOne({ slot_id });
-    if (!slot) {
-      return res.status(404).json({ message: "Slot not found" });
+        const slot = await Slot.findOne({ slot_id: slot_id, reserved_by: userId });
+        if (!slot) {
+            return res.status(404).json({ message: 'Reservation not found.' });
+        }
+
+        slot.is_paid = true;
+        slot.light_status = 'red'; // Paid and reserved
+        slot.gate_status = 'open'; // Open the gate upon payment
+        slot.payment_method = payment_method;
+
+        await slot.save();
+        res.status(200).json(slot);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
-
-    // Check if slot has a pending reservation
-    if (slot.is_available || slot.is_paid) {
-      return res.status(400).json({ message: "No pending reservation for this slot" });
-    }
-
-    if (!slot.reserved_by) {
-      return res.status(400).json({ message: "Slot not reserved by any user" });
-    }
-
-    // Process payment and confirm reservation
-    const updatedSlot = await Slot.findOneAndUpdate(
-      { slot_id },
-      {
-        is_available: false,
-        is_reserved: true,    // Now set reserved to true after payment
-        is_paid: true,
-        gate_status: 'closed',
-        light_status: 'red',  // Red indicates occupied/paid
-        payment_method: payment_method || 'unknown'
-      },
-      { new: true }
-    );
-
-    res.json({ 
-      message: `Payment successful! Slot ${slot_id} is now reserved and paid.`, 
-      slot: updatedSlot 
-    });
-
-  } catch (err) {
-    console.error('Pay for slot error:', err);
-    res.status(500).json({ message: "Server error" });
-  }
 };
 
-// Unlock slot (open the gate for paid slots)
+// POST /api/slots/unlock - Unlock a paid slot (e.g., when user leaves)
 exports.unlockSlot = async (req, res) => {
-  try {
-    const { slot_id } = req.body;
+    try {
+        const { slot_id } = req.body;
+        const userId = req.user.id;
 
-    // Find the slot
-    const slot = await Slot.findOne({ slot_id });
-    if (!slot) {
-      return res.status(404).json({ message: "Slot not found" });
+        const slot = await Slot.findOne({ slot_id: slot_id, reserved_by: userId, is_paid: true });
+        if (!slot) {
+            return res.status(404).json({ message: 'Paid reservation not found.' });
+        }
+
+        // Reset the slot to be fully available
+        slot.is_available = true;
+        slot.is_reserved = false;
+        slot.is_paid = false;
+        slot.light_status = 'green';
+        slot.gate_status = 'closed';
+        slot.reserved_by = null;
+        slot.payment_method = null;
+
+        await slot.save();
+        res.status(200).json({ message: 'Slot unlocked and now available.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
-
-    // Check if slot is paid (can only unlock paid slots)
-    if (!slot.is_paid) {
-      return res.status(400).json({ message: "Slot must be paid before unlocking" });
-    }
-
-    // Unlock the slot (open gate and reset to available)
-    const updatedSlot = await Slot.findOneAndUpdate(
-      { slot_id },
-      {
-        is_available: true,   // Reset to available
-        is_reserved: false,   // Clear reservation
-        is_paid: false,       // Clear payment
-        gate_status: 'open',  // Open the gate
-        light_status: 'green', // Green indicates available
-        reserved_by: null,    // Clear user
-        payment_method: null  // Clear payment method
-      },
-      { new: true }
-    );
-
-    res.json({ 
-      message: `Slot ${slot_id} unlocked successfully! Gate is now open.`, 
-      slot: updatedSlot 
-    });
-
-  } catch (err) {
-    console.error('Unlock slot error:', err);
-    res.status(500).json({ message: "Server error" });
-  }
 };
 
-// Release a slot (admin only)
-exports.releaseSlot = async (req, res) => {
-  try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
+// GET /api/user-slot-status - Get current user's reservation status
+exports.getUserSlotStatus = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const slot = await Slot.findOne({ reserved_by: userId });
+        if (slot) {
+            res.status(200).json(slot);
+        } else {
+            res.status(200).json({ message: 'No active reservation.' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
-    if (!user || user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only admins can release slots' });
-    }
-
-    const { slot_id } = req.body;
-    
-    // Find the slot
-    const slot = await Slot.findOne({ slot_id });
-    if (!slot) {
-      return res.status(404).json({ message: "Slot not found" });
-    }
-
-    // Release the slot (reset to default state)
-    const updatedSlot = await Slot.findOneAndUpdate(
-      { slot_id },
-      {
-        is_reserved: false,
-        is_paid: false,
-        is_available: true,
-        gate_status: 'closed',
-        light_status: 'green',
-        reserved_by: null,
-        payment_method: null
-      },
-      { new: true }
-    );
-
-    res.json({ 
-      message: `Slot ${slot_id} released successfully by admin.`, 
-      slot: updatedSlot 
-    });
-
-  } catch (err) {
-    console.error('Release slot error:', err);
-    if (err.name === 'JsonWebTokenError') {
-      return res.status(401).json({ message: 'Invalid token' });
-    }
-    res.status(500).json({ message: 'Server error' });
-  }
 };
 
-// Get user's current reservation (helper function)
-exports.getUserReservation = async (req, res) => {
-  try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid user' });
-    }
-
-    // Find user's current reservation
-    const reservation = await Slot.findOne({ 
-      reserved_by: user.username,
-      $or: [
-        { is_reserved: true },
-        { is_paid: true }
-      ]
-    });
-
-    if (!reservation) {
-      return res.json({ message: 'No active reservation found', reservation: null });
-    }
-
-    res.json({ 
-      message: 'Active reservation found', 
-      reservation: reservation 
-    });
-
-  } catch (err) {
-    console.error('Get user reservation error:', err);
-    if (err.name === 'JsonWebTokenError') {
-      return res.status(401).json({ message: 'Invalid token' });
-    }
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-// Add this entire function to controllers/slotController.js
-
-// New and improved code
+// POST /api/slots/update-from-hardware - Update status from ESP32 sensor
 exports.updateSlotFromHardware = async (req, res) => {
     try {
         const { slot_id, is_occupied } = req.body;
@@ -273,16 +115,8 @@ exports.updateSlotFromHardware = async (req, res) => {
             return res.status(404).json({ message: "Slot not found" });
         }
 
-        // --- NEW LOGIC ---
-        // A car is detected ONLY if the slot is already paid for.
-        // This prevents random cars from occupying unpaid slots.
-        if (is_occupied && slot.is_paid) {
-            slot.is_available = false;
-            slot.is_reserved = true; // A car is physically in it
-            slot.light_status = 'red'; // Physically occupied
-        } 
         // If a car leaves, the slot becomes fully available again.
-        else if (!is_occupied) {
+        if (!is_occupied) {
             slot.is_available = true;
             slot.is_reserved = false;
             slot.is_paid = false;
@@ -291,18 +125,14 @@ exports.updateSlotFromHardware = async (req, res) => {
             slot.reserved_by = null;
             slot.payment_method = null;
         }
-        // --- END NEW LOGIC ---
+        // Note: We are intentionally NOT handling the is_occupied=true case here.
+        // The 'red' status is set by payment, not by the physical sensor.
+        // This prevents a random car from making a paid slot appear occupied.
 
         const updatedSlot = await slot.save();
-
-        // *** CRITICAL FIX: Respond with the updated slot data ***
-        res.status(200).json(updatedSlot);
-
+        res.status(200).json(updatedSlot); // Respond with the new data
     } catch (error) {
         console.error("Error in updateSlotFromHardware:", error);
         res.status(500).json({ message: "Server error", error: error.message });
     }
 };
-
-
-
