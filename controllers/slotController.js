@@ -261,5 +261,69 @@ exports.getUserReservation = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+// Update slot from hardware (no authentication required)
+exports.updateSlotFromHardware = async (req, res) => {
+  try {
+    const { slot_id, is_occupied } = req.body;
+
+    // Validate input
+    if (!slot_id || typeof is_occupied !== 'boolean') {
+      return res.status(400).json({ 
+        message: 'Invalid input. slot_id and is_occupied (boolean) are required.' 
+      });
+    }
+
+    // Find the slot
+    const slot = await Slot.findOne({ slot_id });
+    if (!slot) {
+      return res.status(404).json({ message: "Slot not found" });
+    }
+
+    // Update slot based on hardware sensor
+    let updateData = {};
+
+    if (is_occupied) {
+      // Car detected - slot is now occupied
+      // Only update if the slot was previously available
+      if (slot.is_available && !slot.is_reserved && !slot.is_paid) {
+        updateData = {
+          is_available: false,
+          gate_status: 'closed',
+          light_status: 'red'  // Red indicates occupied
+        };
+      }
+      // If slot is already reserved/paid, don't change the status
+    } else {
+      // No car detected - slot is now empty
+      // Reset slot to available state (clear any reservations)
+      updateData = {
+        is_available: true,
+        is_reserved: false,
+        is_paid: false,
+        gate_status: 'closed',
+        light_status: 'green',  // Green indicates available
+        reserved_by: null,
+        payment_method: null
+      };
+    }
+
+    // Update the slot
+    const updatedSlot = await Slot.findOneAndUpdate(
+      { slot_id },
+      updateData,
+      { new: true }
+    );
+
+    res.json({ 
+      message: `Slot ${slot_id} updated from hardware. Status: ${is_occupied ? 'OCCUPIED' : 'EMPTY'}`, 
+      slot: updatedSlot 
+    });
+
+  } catch (err) {
+    console.error('Hardware update error:', err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 
 
