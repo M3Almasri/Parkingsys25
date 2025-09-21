@@ -20,4 +20,7 @@ router.post('/release', slotController.releaseSlot);
 // GET /api/slots/my-reservation - Get current user's reservation
 router.get('/my-reservation', slotController.getUserReservation);
 
+// POST /api/slots/update-from-hardware - Update slot from hardware (no auth required)
+router.post('/update-from-hardware', slotController.updateSlotFromHardware);
+
 module.exports = router;
