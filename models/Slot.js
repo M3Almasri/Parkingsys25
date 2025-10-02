@@ -21,7 +21,7 @@ const slotSchema = new mongoose.Schema({
   gate_status: {
     type: String,
     enum: ['open', 'closed'],
-    default: 'closed'
+    default: 'open'
   },
   light_status: {
     type: String,
