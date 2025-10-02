@@ -279,60 +279,45 @@ exports.updateSlotFromHardware = async (req, res) => {
       return res.status(404).json({ message: "Slot not found" });
     }
 
+    // Update slot based on hardware sensor
     let updateData = {};
 
     if (is_occupied) {
-      // Car detected - slot is physically occupied
+      // Car detected - slot is now occupied
+      // Only update if the slot was previously available
       if (slot.is_available && !slot.is_reserved && !slot.is_paid) {
-        // Available slot now has unauthorized car
         updateData = {
           is_available: false,
           gate_status: 'closed',
-          light_status: 'red'  // Red for occupied
+          light_status: 'red'  // Red indicates occupied
         };
       }
-      // If slot is reserved/paid, don't change anything - let user manage it
+      // If slot is already reserved/paid, don't change the status
     } else {
-      // No car detected - slot is physically empty
-      if (slot.is_reserved || slot.is_paid) {
-        // Slot is reserved/paid but now empty - this might be temporary
-        // Don't auto-release, let the user or admin manage it
-        updateData = {
-          // Keep reservation status, just note it's physically empty
-        };
-      } else {
-        // Slot is not reserved and now empty - make it available
-        updateData = {
-          is_available: true,
-          is_reserved: false,
-          is_paid: false,
-          gate_status: 'closed',
-          light_status: 'green',
-          reserved_by: null,
-          payment_method: null
-        };
-      }
+      // No car detected - slot is now empty
+      // Reset slot to available state (clear any reservations)
+      updateData = {
+        is_available: true,
+        is_reserved: false,
+        is_paid: false,
+        gate_status: 'closed',
+        light_status: 'green',  // Green indicates available
+        reserved_by: null,
+        payment_method: null
+      };
     }
 
-    // Only update if there are changes to make
-    if (Object.keys(updateData).length > 0) {
-      const updatedSlot = await Slot.findOneAndUpdate(
-        { slot_id },
-        updateData,
-        { new: true }
-      );
+    // Update the slot
+    const updatedSlot = await Slot.findOneAndUpdate(
+      { slot_id },
+      updateData,
+      { new: true }
+    );
 
-      res.json({ 
-        message: `Slot ${slot_id} updated from hardware. Physical status: ${is_occupied ? 'OCCUPIED' : 'EMPTY'}`, 
-        slot: updatedSlot 
-      });
-    } else {
-      // No changes needed
-      res.json({ 
-        message: `Slot ${slot_id} hardware update received. No changes needed.`, 
-        slot: slot 
-      });
-    }
+    res.json({ 
+      message: `Slot ${slot_id} updated from hardware. Status: ${is_occupied ? 'OCCUPIED' : 'EMPTY'}`, 
+      slot: updatedSlot 
+    });
 
   } catch (err) {
     console.error('Hardware update error:', err);
