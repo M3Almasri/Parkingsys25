@@ -62,7 +62,7 @@ exports.reserveSlot = async (req, res) => {
         is_available: false,  // Mark as not available
         is_reserved: false,   // Don't set reserved until payment
         is_paid: false,
-        gate_status: 'closed',
+        gate_status: 'open',
         light_status: 'yellow', // Yellow indicates pending payment
         reserved_by: user.username
       },
@@ -199,7 +199,7 @@ exports.releaseSlot = async (req, res) => {
         is_reserved: false,
         is_paid: false,
         is_available: true,
-        gate_status: 'closed',
+        gate_status: 'open',
         light_status: 'green',
         reserved_by: null,
         payment_method: null
