@@ -62,7 +62,7 @@ exports.reserveSlot = async (req, res) => {
         is_available: false,  // Mark as not available
         is_reserved: false,   // Don't set reserved until payment
         is_paid: false,
-        gate_status: 'open',
+        gate_status: 'closed',
         light_status: 'yellow', // Yellow indicates pending payment
         reserved_by: user.username
       },
@@ -199,7 +199,7 @@ exports.releaseSlot = async (req, res) => {
         is_reserved: false,
         is_paid: false,
         is_available: true,
-        gate_status: 'open',
+        gate_status: 'closed',
         light_status: 'green',
         reserved_by: null,
         payment_method: null
@@ -288,7 +288,7 @@ exports.updateSlotFromHardware = async (req, res) => {
       if (slot.is_available && !slot.is_reserved && !slot.is_paid) {
         updateData = {
           is_available: false,
-          gate_status: 'open',
+          gate_status: 'closed',
           light_status: 'red'  // Red indicates occupied
         };
       }
@@ -300,7 +300,7 @@ exports.updateSlotFromHardware = async (req, res) => {
         is_available: true,
         is_reserved: false,
         is_paid: false,
-        gate_status: 'open',
+        gate_status: 'closed',
         light_status: 'green',  // Green indicates available
         reserved_by: null,
         payment_method: null
