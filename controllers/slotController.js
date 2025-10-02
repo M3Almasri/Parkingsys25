@@ -261,7 +261,7 @@ exports.getUserReservation = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-// Update slot from hardware (CORRECTED VERSION)
+// IMPROVED updateSlotFromHardware function
 exports.updateSlotFromHardware = async (req, res) => {
   try {
     const { slot_id, is_occupied } = req.body;
@@ -279,52 +279,67 @@ exports.updateSlotFromHardware = async (req, res) => {
       return res.status(404).json({ message: "Slot not found" });
     }
 
-    // *** CORRECTED LOGIC: Hardware only updates physical occupancy ***
     let updateData = {};
 
     if (is_occupied) {
-      // Car detected - mark as physically occupied
-      // But preserve existing reservation/payment status
-      updateData = {
-        is_available: false  // Slot is physically occupied
-        // DON'T change is_reserved, is_paid, reserved_by, etc.
-      };
+      // Car detected - slot is physically occupied
+      if (slot.is_available && !slot.is_reserved && !slot.is_paid) {
+        // Available slot now has unauthorized car
+        updateData = {
+          is_available: false,
+          gate_status: 'closed',
+          light_status: 'red'  // Red for occupied
+        };
+      }
+      // If slot is reserved/paid, don't change anything - let user manage it
     } else {
       // No car detected - slot is physically empty
-      // Only reset to available if it's NOT reserved or paid
-      if (!slot.is_reserved && !slot.is_paid) {
-        // Slot is empty and has no reservation - make it available
+      if (slot.is_reserved || slot.is_paid) {
+        // Slot is reserved/paid but now empty - this might be temporary
+        // Don't auto-release, let the user or admin manage it
         updateData = {
-          is_available: true,
-          gate_status: 'closed',
-          light_status: 'green'
+          // Keep reservation status, just note it's physically empty
         };
       } else {
-        // Slot is empty but IS reserved/paid - keep the reservation
+        // Slot is not reserved and now empty - make it available
         updateData = {
-          is_available: false,  // Keep as unavailable (reserved)
-          // Preserve all reservation data
+          is_available: true,
+          is_reserved: false,
+          is_paid: false,
+          gate_status: 'closed',
+          light_status: 'green',
+          reserved_by: null,
+          payment_method: null
         };
       }
     }
 
-    // Update the slot
-    const updatedSlot = await Slot.findOneAndUpdate(
-      { slot_id },
-      updateData,
-      { new: true }
-    );
+    // Only update if there are changes to make
+    if (Object.keys(updateData).length > 0) {
+      const updatedSlot = await Slot.findOneAndUpdate(
+        { slot_id },
+        updateData,
+        { new: true }
+      );
 
-    res.json({ 
-      message: `Slot ${slot_id} updated from hardware. Physical status: ${is_occupied ? 'OCCUPIED' : 'EMPTY'}`, 
-      slot: updatedSlot 
-    });
+      res.json({ 
+        message: `Slot ${slot_id} updated from hardware. Physical status: ${is_occupied ? 'OCCUPIED' : 'EMPTY'}`, 
+        slot: updatedSlot 
+      });
+    } else {
+      // No changes needed
+      res.json({ 
+        message: `Slot ${slot_id} hardware update received. No changes needed.`, 
+        slot: slot 
+      });
+    }
 
   } catch (err) {
     console.error('Hardware update error:', err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 
