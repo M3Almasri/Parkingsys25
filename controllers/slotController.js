@@ -261,7 +261,7 @@ exports.getUserReservation = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-// Update slot from hardware (no authentication required)
+// Update slot from hardware (CORRECTED VERSION)
 exports.updateSlotFromHardware = async (req, res) => {
   try {
     const { slot_id, is_occupied } = req.body;
@@ -279,32 +279,33 @@ exports.updateSlotFromHardware = async (req, res) => {
       return res.status(404).json({ message: "Slot not found" });
     }
 
-    // Update slot based on hardware sensor
+    // *** CORRECTED LOGIC: Hardware only updates physical occupancy ***
     let updateData = {};
 
     if (is_occupied) {
-      // Car detected - slot is now occupied
-      // Only update if the slot was previously available
-      if (slot.is_available && !slot.is_reserved && !slot.is_paid) {
+      // Car detected - mark as physically occupied
+      // But preserve existing reservation/payment status
+      updateData = {
+        is_available: false  // Slot is physically occupied
+        // DON'T change is_reserved, is_paid, reserved_by, etc.
+      };
+    } else {
+      // No car detected - slot is physically empty
+      // Only reset to available if it's NOT reserved or paid
+      if (!slot.is_reserved && !slot.is_paid) {
+        // Slot is empty and has no reservation - make it available
         updateData = {
-          is_available: false,
+          is_available: true,
           gate_status: 'closed',
-          light_status: 'red'  // Red indicates occupied
+          light_status: 'green'
+        };
+      } else {
+        // Slot is empty but IS reserved/paid - keep the reservation
+        updateData = {
+          is_available: false,  // Keep as unavailable (reserved)
+          // Preserve all reservation data
         };
       }
-      // If slot is already reserved/paid, don't change the status
-    } else {
-      // No car detected - slot is now empty
-      // Reset slot to available state (clear any reservations)
-      updateData = {
-        is_available: true,
-        is_reserved: false,
-        is_paid: false,
-        gate_status: 'closed',
-        light_status: 'green',  // Green indicates available
-        reserved_by: null,
-        payment_method: null
-      };
     }
 
     // Update the slot
@@ -315,7 +316,7 @@ exports.updateSlotFromHardware = async (req, res) => {
     );
 
     res.json({ 
-      message: `Slot ${slot_id} updated from hardware. Status: ${is_occupied ? 'OCCUPIED' : 'EMPTY'}`, 
+      message: `Slot ${slot_id} updated from hardware. Physical status: ${is_occupied ? 'OCCUPIED' : 'EMPTY'}`, 
       slot: updatedSlot 
     });
 
