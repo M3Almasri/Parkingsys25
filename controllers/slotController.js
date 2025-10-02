@@ -288,7 +288,7 @@ exports.updateSlotFromHardware = async (req, res) => {
       if (slot.is_available && !slot.is_reserved && !slot.is_paid) {
         updateData = {
           is_available: false,
-          gate_status: 'closed',
+          gate_status: 'open',
           light_status: 'red'  // Red indicates occupied
         };
       }
@@ -300,7 +300,7 @@ exports.updateSlotFromHardware = async (req, res) => {
         is_available: true,
         is_reserved: false,
         is_paid: false,
-        gate_status: 'closed',
+        gate_status: 'open',
         light_status: 'green',  // Green indicates available
         reserved_by: null,
         payment_method: null
