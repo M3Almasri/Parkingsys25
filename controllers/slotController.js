@@ -55,7 +55,7 @@ exports.reserveSlot = async (req, res) => {
         is_available: false,
         is_reserved: false,
         is_paid: false,
-        gate_status: 'closed', // Correct: Gate closes to hold the spot
+        gate_status: 'open', // Correct: Gate closes to hold the spot
         light_status: 'yellow',
         reserved_by: user.username
       },
